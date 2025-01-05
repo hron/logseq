@@ -2562,6 +2562,31 @@
       (util/scroll-to-block sibling-block)
       (state/exit-editing-and-set-selected-blocks! [sibling-block]))))
 
+(defn- select-page-up-down
+  [direction]
+  (let [selected-blocks (state/get-selection-blocks)
+        selected (case direction
+                   :up (first selected-blocks)
+                   :down (last selected-blocks))
+        page-blocks (filter util/element-visible? (util/get-blocks-noncollapse))
+        blocks-per-page (count page-blocks)
+        f (case direction
+            :up first
+            :down last)
+        target-block (f page-blocks)
+        scroll-target target-block
+        f (case direction
+            :up util/get-prev-nth-block-non-collapsed
+            :down util/get-next-nth-block-non-collapsed)
+        [target-block scroll-target] (if (>= selected target-block)
+                                       [(f selected blocks-per-page)
+                                        (f selected
+                                           (Math/round (/ blocks-per-page 2)))]
+                                       [target-block scroll-target])]
+    (when (and target-block (dom/attr target-block "blockid"))
+      (util/scroll-to-block scroll-target)
+      (state/exit-editing-and-set-selected-blocks! [target-block]))))
+
 (defn- move-cross-boundary-up-down
   [direction]
   (let [input (state/get-input)
@@ -3266,6 +3291,24 @@
         (state/selection?)
         (select-up-down direction)
 
+        ;; if there is an edit-input-id set, we are probably still on editing mode, that is not fully initialized
+        (not (state/get-edit-input-id))
+        (select-first-last direction)))
+    nil))
+
+(defn shortcut-page-up-down [direction]
+  (fn [e]
+    (when (and (not (auto-complete?))
+               (not (slide-focused?))
+               (not (state/get-timestamp-block)))
+      (util/stop e)
+      (cond
+        (state/editing?)
+        (keydown-up-down-handler direction)
+        
+        (state/selection?)
+        (select-page-up-down direction)
+        
         ;; if there is an edit-input-id set, we are probably still on editing mode, that is not fully initialized
         (not (state/get-edit-input-id))
         (select-first-last direction)))

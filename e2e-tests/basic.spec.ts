@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test'
+import { expect, Locator, Page } from '@playwright/test'
 import fs from 'fs/promises'
 import path from 'path'
 import { test } from './fixtures'
@@ -84,6 +84,43 @@ test('delete and backspace', async ({ page, block }) => {
 
 })
 
+test('pageup and pagedown', async ({page, block}) => {
+  await createRandomPage(page)
+
+  const totalBlocks = 30
+  for (let i = 0; i < totalBlocks; i++) {
+    await block.mustFill(`Block ${i}`)
+    if (i < totalBlocks - 1) await block.enterNext()
+  }
+  await block.escapeEditing()
+  await page.keyboard.press('ArrowUp')
+
+  const pressAndWaitForAnimation = async (page: Page, key: string) => {
+    await page.keyboard.press(key)
+    return page.waitForTimeout(100)
+  }
+  
+  let selectedBlock: Locator
+  await pressAndWaitForAnimation(page, 'PageUp')
+  selectedBlock = page.locator('.ls-block.selected').getByText('Block 12')
+  await expect(selectedBlock).toBeInViewport()
+  await expect(selectedBlock).toHaveCount(1)
+
+  await pressAndWaitForAnimation(page, 'PageUp')
+  selectedBlock = page.locator('.ls-block.selected').getByText('Block 0')
+  await expect( selectedBlock ).toBeInViewport()
+  await expect( selectedBlock ).toHaveCount(1)
+
+  await pressAndWaitForAnimation(page, 'PageDown')
+  selectedBlock = page.locator('.ls-block.selected').getByText('Block 16')
+  await expect( selectedBlock ).toBeInViewport()
+  await expect( selectedBlock ).toHaveCount(1)
+
+  await pressAndWaitForAnimation(page, 'PageDown')
+  selectedBlock = page.locator('.ls-block.selected').getByText('Block 29')
+  await expect( selectedBlock ).toBeInViewport()
+  await expect( selectedBlock ).toHaveCount(1)
+})
 
 test('block selection', async ({ page, block }) => {
   await createRandomPage(page)
@@ -158,6 +195,8 @@ test('block selection', async ({ page, block }) => {
   await page.click('.ls-block >> nth=5')
   await block.waitForSelectedBlocks(6)
   await page.keyboard.up('Shift')
+
+  // 
 })
 
 test('template', async ({ page, block }) => {

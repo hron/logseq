@@ -2562,6 +2562,35 @@
       (util/scroll-to-block sibling-block)
       (state/exit-editing-and-set-selected-blocks! [sibling-block]))))
 
+(defn- compute-target-page-up-down
+  [direction current-block]
+  (let [blocks (util/get-blocks-noncollapse)
+        visible-blocks (filter util/element-visible? blocks)
+        blocks-per-page (count visible-blocks)
+        f (case direction
+            :up #(nth % 2 (first %))
+            :down #(nth % -2 (last %)))
+        target-block (f visible-blocks)
+        scroll-target target-block
+        [f pos-f round-f] (case direction
+                            :up [util/get-prev-nth-block-non-collapsed util/is-block-before? Math/floor]
+                            :down [util/get-next-nth-block-non-collapsed util/is-block-after? Math/round])]
+    
+    (if (pos-f current-block target-block)
+      [(f current-block blocks-per-page) (f current-block (round-f (/ blocks-per-page 2)))]
+      [target-block scroll-target])))
+
+(defn- select-page-up-down
+  [direction]
+  (let [selected-blocks (state/get-selection-blocks)
+        selected (case direction
+                   :up (first selected-blocks)
+                   :down (last selected-blocks))
+        [target-block scroll-target] (compute-target-page-up-down direction selected)]
+    (when (and target-block (dom/attr target-block "blockid"))
+      (util/scroll-to-block scroll-target)
+      (state/exit-editing-and-set-selected-blocks! [target-block]))))
+
 (defn- move-cross-boundary-up-down
   [direction]
   (let [input (state/get-input)
@@ -2581,6 +2610,32 @@
 
         (let [new-id (string/replace (gobj/get sibling-block "id") "ls-block" "edit-block")
               new-uuid (cljs.core/uuid sibling-block-id)
+              block (db/pull repo '[*] [:block/uuid new-uuid])]
+          (edit-block! block
+                       [direction line-pos]
+                       new-id)))
+      (case direction
+        :up (cursor/move-cursor-to input 0)
+        :down (cursor/move-cursor-to-end input)))))
+
+(defn- move-cross-boundary-page-up-down
+  [direction]
+  (let [input (state/get-input)
+        line-pos (util/get-first-or-last-line-pos input)
+        repo (state/get-current-repo)
+        current-block (gdom/getElement (state/get-editing-block-dom-id))
+        [target-block] (compute-target-page-up-down direction current-block)
+        {:block/keys [uuid content format]} (state/get-edit-block)]
+
+    (if target-block
+      (when-let [target-block-id (dom/attr target-block "blockid")]
+        (let [value (state/get-edit-content)]
+          (when (not= (clean-content! format content)
+                      (string/trim value))
+            (save-block! repo uuid value)))
+
+        (let [new-id (string/replace (gobj/get target-block "id") "ls-block" "edit-block")
+              new-uuid (cljs.core/uuid target-block-id)
               block (db/pull repo '[*] [:block/uuid new-uuid])]
           (edit-block! block
                        [direction line-pos]
@@ -2634,6 +2689,28 @@
             (save-block! repo uuid value)))
         (let [block (db/pull repo '[*] [:block/uuid (cljs.core/uuid sibling-block-id)])]
           (edit-block! block pos id))))))
+
+(defn keydown-page-up-down-handler
+  [direction]
+  (let [input (state/get-input)
+        selected-start (util/get-selection-start input)
+        selected-end (util/get-selection-end input)
+        up? (= direction :up)
+        down? (= direction :down)]
+    (cond
+      (not= selected-start selected-end)
+      (if up?
+        (cursor/move-cursor-to input selected-start)
+        (cursor/move-cursor-to input selected-end))
+
+      (or (and up? (cursor/textarea-cursor-first-row? input))
+          (and down? (cursor/textarea-cursor-last-row? input)))
+      (move-cross-boundary-page-up-down direction)
+
+      :else
+      (if up?
+        (cursor/move-cursor-first-row input)
+        (cursor/move-cursor-last-row input)))))
 
 (defn keydown-arrow-handler
   [direction]
@@ -3266,6 +3343,24 @@
         (state/selection?)
         (select-up-down direction)
 
+        ;; if there is an edit-input-id set, we are probably still on editing mode, that is not fully initialized
+        (not (state/get-edit-input-id))
+        (select-first-last direction)))
+    nil))
+
+(defn shortcut-page-up-down [direction]
+  (fn [e]
+    (when (and (not (auto-complete?))
+               (not (slide-focused?))
+               (not (state/get-timestamp-block)))
+      (util/stop e)
+      (cond
+        (state/editing?)
+        (keydown-page-up-down-handler direction)
+        
+        (state/selection?)
+        (select-page-up-down direction)
+        
         ;; if there is an edit-input-id set, we are probably still on editing mode, that is not fully initialized
         (not (state/get-edit-input-id))
         (select-first-last direction)))

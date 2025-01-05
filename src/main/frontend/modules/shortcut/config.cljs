@@ -276,6 +276,12 @@
    :editor/down                             {:binding ["down" "ctrl+n"]
                                              :fn      (editor-handler/shortcut-up-down :down)}
 
+   :editor/page-up                          {:binding ["pg-up"]
+                                             :fn      (editor-handler/shortcut-page-up-down :up)}
+
+   :editor/page-down                        {:binding ["pg-down"]
+                                             :fn      (editor-handler/shortcut-page-up-down :down)}
+
    :editor/left                             {:binding "left"
                                              :fn      (editor-handler/shortcut-left-right :left)}
 
@@ -659,6 +665,8 @@
             :editor/down
             :editor/left
             :editor/right
+            :editor/page-up
+            :editor/page-down
             :editor/select-up
             :editor/select-down
             :editor/move-block-up
@@ -784,6 +792,8 @@
       :editor/down
       :editor/left
       :editor/right
+      :editor/page-up
+      :editor/page-down
       :editor/collapse-block-children
       :editor/expand-block-children
       :editor/toggle-block-children

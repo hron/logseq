@@ -683,10 +683,13 @@
         show-more (fn [] (swap! (::results state) assoc-in [highlighted-group :show] :more))
         input @(::input state)
         as-keydown? (or (= keyname "ArrowDown") (and ctrl? (= keyname "n")))
-        as-keyup? (or (= keyname "ArrowUp") (and ctrl? (= keyname "p")))]
+        as-keyup? (or (= keyname "ArrowUp") (and ctrl? (= keyname "p")))
+        as-key-pagedown? (= keyname "PageDown")
+        as-key-pageup? (= keyname "PageUp")]
+    (js/console.error "keydown-handler")
     (reset! (::shift? state) shift?)
     (reset! (::meta? state) meta?)
-    (when (or as-keydown? as-keyup?)
+    (when (or as-keydown? as-keyup? as-key-pagedown? as-key-pageup?)
       (util/stop e))
 
     (cond
